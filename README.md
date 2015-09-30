@@ -21,7 +21,7 @@ Features
 
 Given a postcode, this extension will return the city district, bourough and federal riding.
 
-For more complex requirements, see: https://www.drupal.org/project/civinorth
+For more advanced requirements, see: https://www.drupal.org/project/civinorth
 
 Requirements
 ============
