@@ -55,7 +55,7 @@ function civicrm_api3_regionlookuprepresent_ridinglookup($params) {
       sleep(1);
     }
     elseif ($dao->postal_code) {
-
+      Civi::log()->warning($dao->contact_id . ': [' . $dao->postal_code . '] Address is not geocoded and postcode lookup not currently implemented.');
     }
   }
 }
