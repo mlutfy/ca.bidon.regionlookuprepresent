@@ -6,7 +6,7 @@ Lookup and complete form fields from a given key (ex: postcode) using the Open N
 Written and maintained by (C) Mathieu Lutfy, 2015-2017  
 https://www.symbiotic.coop/en
 
-To get the latest version of this module:  
+To get the latest version of this extension:  
 https://github.com/mlutfy/ca.bidon.regionlookuprepresent
 
 Distributed under the terms of the GNU Affero General public license (AGPL).
