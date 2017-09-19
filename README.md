@@ -3,7 +3,7 @@ Open North Represent integration for CiviCRM Region Lookup
 
 Lookup and complete form fields from a given key (ex: postcode) using the Open North Represent API.
 
-Written and maintained by (C) Mathieu Lutfy, 2015  
+Written and maintained by (C) Mathieu Lutfy, 2015-2017  
 https://www.symbiotic.coop/en
 
 To get the latest version of this module:  
@@ -23,10 +23,34 @@ Given a postcode, this extension will return the city district, bourough and fed
 
 For more advanced requirements, see: https://www.drupal.org/project/civinorth
 
+Experimental features
+=====================
+
+The following APIs have hardcoded values and a lot of "FIXME" tags in the
+code. They are highly experimental and should not be relied upon. They are
+available so that other developers can improve them. If you are a developer,
+please file an issue and let's discuss how we can make the code more flexible.
+You can also contract Coop SymbioTIC to adapt this code for your organisation's
+needs.
+
+`Regionlookuprepresent.Updatefederalridings contact_sub_type=Federal_riding`
+
+This API will import/update a list of federal ridings into CiviCRM. The
+`contact_sub_type` must be specified. The are a lot of odd things about this
+import: it will import the Party name as a string (instead of an indexed list)
+and it will import the MP name in custom fields (instead of creating a separate
+individual contact).
+
+`Regionlookuprepresent.Ridinglookup`
+
+Assuming the contacts have a "federal riding" custom field (of type "contact
+reference") and a known postal address, this API call will lookup their
+(federal) riding in Represent (using either their geolocation).
+
 Requirements
 ============
 
-- CiviCRM >= 4.4 (latest CiviCRM version recommended)
+- CiviCRM >= 4.7 (latest CiviCRM version recommended)
 - latest version of ca.bidon.regionlookup (https://github.com/mlutfy/ca.bidon.regionlookup)
 
 Installation
@@ -61,13 +85,14 @@ If you appreciate this module, please consider supporting the CiviCRM project:
 If you are a member or a partner, please do mention it when posting in the issue queue.
 
 Commercial support is available from Coop SymbioTIC:  
-https://www.symbiotic.coop/en
+https://www.symbiotic.coop/en  
 info@symbiotic.coop
 
 License
 =======
 
-(C) 2015 Mathieu Lutfy <mathieu@symbiotic.coop>
+(C) 2015-2017 Mathieu Lutfy <mathieu@symbiotic.coop>  
+(C) 2015-2017 Coop SymbioTIC <info@symbiotic.coop>
 
 Distributed under the terms of the GNU Affero General public license (AGPL).
 See LICENSE.txt for details.
