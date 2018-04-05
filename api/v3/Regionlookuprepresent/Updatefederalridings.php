@@ -5,7 +5,9 @@ function _civicrm_api3_regionlookuprepresent_updatefederalridings_spec(&$spec) {
 }
 
 function civicrm_api3_regionlookuprepresent_updatefederalridings($params) {
-  $result = file_get_contents('https://represent.opennorth.ca/representatives/house-of-commons/?limit=999');
+  $options = array('http' => array('user_agent' => 'CiviCRM RegionLookupRepresent'));
+  $context  = stream_context_create($options);
+  $result = file_get_contents('https://represent.opennorth.ca/representatives/house-of-commons/?limit=999', FALSE, $context);
 
   $contact_type = $params['contact_sub_type'];
 
