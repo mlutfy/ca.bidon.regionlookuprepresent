@@ -12,7 +12,14 @@ function civicrm_api3_regionlookuprepresent_ridinglookup($params) {
       AND info.federal_riding_64 IS NULL
       AND geo_code_1 IS NOT NULL';
 
-  $dao = CRM_Core_DAO::executeQuery($sql);
+  $sqlparams = [];
+
+  if (!empty($params['contact_id'])) {
+    $sql .= ' AND c.id = %1';
+    $sqlparams[1] = [$params['contact_id'], 'Positive'];
+  }
+
+  $dao = CRM_Core_DAO::executeQuery($sql, $sqlparams);
 
   while ($dao->fetch()) {
     if ($dao->geo_code_1 && $dao->geo_code_2) {

@@ -25,8 +25,19 @@ class CRM_Regionlookuprepresent_BAO_Riding {
 
     self::createFromRepresentEmail($values, $contact_id);
     self::createFromRepresentWebsites($values, $contact_id);
+    self::createFromRepresentIndividual($values, $contact_id);
+
+    $found_constituency_office = FALSE;
 
     foreach ($values['offices'] as $office) {
+      // There might be multiple constituency offices, we only want the first one (main office).
+      if ($office['type'] == 'constituency') {
+        if ($found_constituency_office) {
+          continue;
+        }
+        $found_constituency_office = TRUE;
+      }
+
       self::createFromRepresentAddress($office, $contact_id);
       self::createFromRepresentPhone($office, $contact_id);
     }
@@ -62,6 +73,34 @@ class CRM_Regionlookuprepresent_BAO_Riding {
   }
 
   /**
+   * Given an organisation (riding) contact_id, create/update the individual
+   * record for the member of parliament.
+   */
+  static public function createFromRepresentIndividual($values, $contact_id) {
+    // Fetch relationships of type "member of parliament"
+    $individual_id = NULL;
+
+    $result = civicrm_api3('Relationship', 'get', [
+      'contact_id_a' => $contact_id,
+      'relationship_type_id' => 155,
+      'api.Contact.get' => [
+        'id' => '$value.contact_id_a',
+        'return.first_name' => 1,
+        'return.last_name' => 1,
+        'return.custom_68' => 1, // party name
+      ],
+    ]);
+
+if ($contact_id == 7818) {
+  Civi::log()->warning('createFromRepresentIndividual:' . print_r($result, 1));
+}
+
+    foreach ($result['values'] as $rel) {
+      // FIXME
+    }
+  }
+
+  /**
    *
    */
   static public function createFromRepresentEmail($values, $contact_id) {
@@ -80,6 +119,16 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     $params['contact_id'] = $contact_id;
     $params['email'] = $values['email'];
     $params['location_type_id'] = 8; // FIXME
+
+    // If there is no email, it might be a vacant riding.
+    // Delete the old email, if there was one.
+    if (empty($params['email'])) {
+      if (!empty($params['id'])) {
+        civicrm_api3('Email', 'delete', $params);
+      }
+
+      return;
+    }
 
     civicrm_api3('Email', 'create', $params);
   }
@@ -196,9 +245,14 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     // Unit E                                                  
     // Morden MB  R6M 2E1
 
+    // We only import the Main Office, so this is not relevant.
+    $parts[0] = preg_replace('/\(Main Office\)/', '', $parts[0]);
+
     $params['street_address'] = array_shift($parts);
 
     while (count($parts) > 1) {
+      $parts[0] = preg_replace('/\(Main Office\)/', '', $parts[0]);
+
       // Ignore empty lines
       if (empty($parts[0])) {
         array_shift($parts);
@@ -241,6 +295,10 @@ class CRM_Regionlookuprepresent_BAO_Riding {
 
     // We assume that what is left is the city
     $params['city'] = $last_line;
+
+    // Skip geolocation, because it can generate timeouts
+    // There is another CiviCRM cron for this.
+    $params['skip_geocode'] = TRUE;
 
     civicrm_api3('Address', 'create', $params);
   }
