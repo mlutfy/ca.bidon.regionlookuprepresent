@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<menu>
+  <item>
+    <path>civicrm/admin/setting/regionlookuprepresent</path>
+    <page_callback>CRM_Regionlookuprepresent_Form_RegionlookupRepresentSettings</page_callback>
+    <title>RegionlookupRepresentSettings</title>
+    <access_arguments>access CiviCRM</access_arguments>
+  </item>
+</menu>

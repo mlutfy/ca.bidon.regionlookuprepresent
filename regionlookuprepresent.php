@@ -81,3 +81,20 @@ function regionlookuprepresent_civicrm_upgrade($op, CRM_Queue_Queue $queue = NUL
 function regionlookuprepresent_civicrm_regionlookup_config(&$methods) {
   $methods['CRM_Regionlookuprepresent_BAO_RegionLookup'] = ts('Represent (Open North)');
 }
+
+/**
+ * Implements hook_civicrm_config().
+ *
+ * @param $metaDataFolders
+ */
+function regionlookuprepresent_civicrm_alterSettingsFolders(&$metaDataFolders){
+  static $configured = FALSE;
+  if ($configured) return;
+  $configured = TRUE;
+
+  $extRoot = dirname( __FILE__ ) . DIRECTORY_SEPARATOR;
+  $extDir = $extRoot . 'settings';
+  if(!in_array($extDir, $metaDataFolders)){
+    $metaDataFolders[] = $extDir;
+  }
+}

@@ -44,7 +44,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
   }
 
   /**
-   *
+   * Creates the organisation record for the riding.
    */
   static public function createFromRepresentContact($values, $contact_sub_type, $contact_id = NULL) {
     $params = [];
@@ -63,10 +63,12 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     }
 
     // FIXME: hardcoded custom field
-    $params['custom_66'] = $values['first_name'];
-    $params['custom_67'] = $values['last_name'];
-    $params['custom_68'] = $values['party_name'];
-    $params['custom_69'] = $values['photo_url'];
+/*
+    $params['custom_1'] = $values['first_name'];
+    $params['custom_2'] = $values['last_name'];
+    $params['custom_3'] = $values['party_name'];
+    $params['custom_4'] = $values['photo_url'];
+*/
 
     $result = civicrm_api3('Contact', 'create', $params);
     return $result['id'];
@@ -78,26 +80,89 @@ class CRM_Regionlookuprepresent_BAO_Riding {
    */
   static public function createFromRepresentIndividual($values, $contact_id) {
     // Fetch relationships of type "member of parliament"
+
+    $relationship_type_id = Civi::settings()->get('regionlookuprepresent_federalriding_mp_reltype');
+    $contact_sub_type_id = Civi::settings()->get('regionlookuprepresent_federalriding_mp_ctype');
+    $custom_party = 'custom_' . Civi::settings()->get('regionlookuprepresent_party_field');
+
+    if (empty($relationship_type_id) || empty($contact_sub_type_id)) {
+      return;
+    }
+
+    $contact_sub_type = civicrm_api3('ContactType', 'getvalue', [
+      'id' => $contact_sub_type_id,
+      'return' => 'name',
+    ]);
+
     $individual_id = NULL;
 
     $result = civicrm_api3('Relationship', 'get', [
       'contact_id_a' => $contact_id,
-      'relationship_type_id' => 155,
+      'relationship_type_id' => $relationship_type_id,
+      'is_active' => 1,
       'api.Contact.get' => [
-        'id' => '$value.contact_id_a',
+        'id' => '$value.contact_id_b',
         'return.first_name' => 1,
         'return.last_name' => 1,
-        'return.custom_68' => 1, // party name
+        'return.$custom_party' => 1,
       ],
     ]);
 
-if ($contact_id == 7818) {
-  Civi::log()->warning('createFromRepresentIndividual:' . print_r($result, 1));
-}
+    $found_individual = FALSE;
 
+    // It's unlikely that there are multiple related contacts,
+    // but just in case, we will disable all non-matching relationships.
     foreach ($result['values'] as $rel) {
-      // FIXME
+      $c = $rel['api.Contact.get']['values'][0];
+
+      if ($c['first_name'] == $values['first_name'] && $c['last_name'] == $values['last_name']) {
+        $found_individual = TRUE;
+      }
+      else {
+        civicrm_api3('Relationship', 'create', [
+          'id' => $rel['id'],
+          'is_active' => 0,
+          'end_date' => date('Y-m-d'),
+        ]);
+      }
     }
+
+    if (!$found_individual) {
+      self::createFromRepresentIndividualHelper([
+        'riding_contact_id' => $contact_id,
+        'contact_sub_type' => $contact_sub_type,
+        'relationship_type_id' => $relationship_type_id,
+        'first_name' => $values['first_name'],
+        'last_name' => $values['last_name'],
+        'party_name' => $values['party_name'],
+        'photo_url' => $values['photo_url'],
+      ]);
+    }
+  }
+
+  /**
+   *
+   */
+  static public function createFromRepresentIndividualHelper($params) {
+    $custom_party = 'custom_' . Civi::settings()->get('regionlookuprepresent_party_field');
+
+    $individual = civicrm_api3('Contact', 'create', [
+      'contact_type' => 'Individual',
+      'contact_sub_type' => $params['contact_sub_type'],
+      'first_name' => $params['first_name'],
+      'last_name' => $params['last_name'],
+      "$custom_party" => $params['party_name'],
+    ]);
+
+    // FIXME/TODO: photo_url
+
+    civicrm_api3('Relationship', 'create', [
+      'relationship_type_id' => $params['relationship_type_id'],
+      'contact_id_a' => $params['riding_contact_id'],
+      'contact_id_b' => $individual['id'],
+      'is_active' => 1,
+      'start_date' => date('Y-m-d'),
+    ]);
   }
 
   /**
@@ -106,9 +171,15 @@ if ($contact_id == 7818) {
   static public function createFromRepresentEmail($values, $contact_id) {
     $params = [];
 
+    $location_type_id = Civi::settings()->get('regionlookuprepresent_email_loctype_id');
+
+    if (empty($location_type_id)) {
+      return;
+    }
+
     $result = civicrm_api3('Email', 'get', [
       'contact_id' => $contact_id,
-      'location_type_id' => 8, // FIXME hardcoded. 8=legislature. MPs only have 1 official email.
+      'location_type_id' => $location_type_id,
       'sequential' => 1,
     ]);
 
@@ -116,9 +187,13 @@ if ($contact_id == 7818) {
       $params['id'] = $result['values'][0]['id'];
     }
 
+    if (empty($values['email'])) {
+      return;
+    }
+
     $params['contact_id'] = $contact_id;
     $params['email'] = $values['email'];
-    $params['location_type_id'] = 8; // FIXME
+    $params['location_type_id'] = $location_type_id;
 
     // If there is no email, it might be a vacant riding.
     // Delete the old email, if there was one.
@@ -139,29 +214,13 @@ if ($contact_id == 7818) {
   static public function createFromRepresentWebsites($values, $contact_id) {
     $params = [];
 
-    // Main website (usually the offical government one, not a party/personal site).
-    $result = civicrm_api3('Website', 'get', [
-      'contact_id' => $contact_id,
-      'website_type_id' => 1, // FIXME hardcoded. 1=main website
-      'sequential' => 1,
-    ]);
+    $website_type_id = Civi::settings()->get('regionlookuprepresent_website_type_id');
 
-    if ($result['count']) {
-      $params['id'] = $result['values'][0]['id'];
-    }
-
-    $params['contact_id'] = $contact_id;
-    $params['url'] = $values['url'];
-    $params['website_type_id'] = 1; // FIXME
-
-    civicrm_api3('Website', 'create', $params);
-
-    // Twitter
-    $params = [];
-    if (isset($values['extra']['twitter'])) {
+    if (!empty($website_type_id)) {
+      // Main website (usually the offical government one, not a party/personal site).
       $result = civicrm_api3('Website', 'get', [
         'contact_id' => $contact_id,
-        'website_type_id' => 11, // FIXME hardcoded. 11=twitter
+        'website_type_id' => $website_type_id,
         'sequential' => 1,
       ]);
 
@@ -170,30 +229,58 @@ if ($contact_id == 7818) {
       }
 
       $params['contact_id'] = $contact_id;
-      $params['url'] = $values['extra']['twitter'];
-      $params['website_type_id'] = 11; // FIXME twitter
+      $params['url'] = $values['url'];
+      $params['website_type_id'] = $website_type_id;
 
       civicrm_api3('Website', 'create', $params);
+    }
+
+    // Twitter
+    $twitter_type_id = Civi::settings()->get('regionlookuprepresent_twitter_type_id');
+
+    if (!empty($twitter_type_id)) {
+      $params = [];
+      if (isset($values['extra']['twitter'])) {
+        $result = civicrm_api3('Website', 'get', [
+          'contact_id' => $contact_id,
+          'website_type_id' => $twitter_type_id,
+          'sequential' => 1,
+        ]);
+
+        if ($result['count']) {
+          $params['id'] = $result['values'][0]['id'];
+        }
+
+        $params['contact_id'] = $contact_id;
+        $params['url'] = $values['extra']['twitter'];
+        $params['website_type_id'] = $twitter_type_id;
+
+        civicrm_api3('Website', 'create', $params);
+      }
     }
 
     // Personnal
-    $params = [];
-    if (!empty($values['personal_url'])) {
-      $result = civicrm_api3('Website', 'get', [
-        'contact_id' => $contact_id,
-        'website_type_id' => 15, // FIXME website contact form
-        'sequential' => 1,
-      ]);
+    $personalwebsite_type_id = Civi::settings()->get('regionlookuprepresent_personalwebsite_type_id');
 
-      if ($result['count']) {
-        $params['id'] = $result['values'][0]['id'];
+    if (!empty($personalwebsite_type_id)) {
+      $params = [];
+      if (!empty($values['personal_url'])) {
+        $result = civicrm_api3('Website', 'get', [
+          'contact_id' => $contact_id,
+          'website_type_id' => $personalwebsite_type_id,
+          'sequential' => 1,
+        ]);
+
+        if ($result['count']) {
+          $params['id'] = $result['values'][0]['id'];
+        }
+
+        $params['contact_id'] = $contact_id;
+        $params['url'] = $values['personal_url'];
+        $params['website_type_id'] = $personalwebsite_type_id;
+
+        civicrm_api3('Website', 'create', $params);
       }
-
-      $params['contact_id'] = $contact_id;
-      $params['url'] = $values['personal_url'];
-      $params['website_type_id'] = 15; // FIXME website contact form
-
-      civicrm_api3('Website', 'create', $params);
     }
   }
 
@@ -202,8 +289,8 @@ if ($contact_id == 7818) {
    */
   static public function createFromRepresentAddress($values, $contact_id) {
     $map = [
-      'legislature' => 8, // FIXME
-      'constituency' => 9, // FIXME
+      'legislature' => Civi::settings()->get('regionlookuprepresent_legislature_loctype_id'),
+      'constituency' => Civi::settings()->get('regionlookuprepresent_constituent_loctype_id'),
     ];
 
     $params = [
@@ -215,11 +302,10 @@ if ($contact_id == 7818) {
       return;
     }
 
-    if (isset($map[$values['type']])) {
+    if (!empty($map[$values['type']])) {
       $params['location_type_id'] = $map[$values['type']];
     }
-
-    if (empty($params['location_type_id'])) {
+    else {
       CRM_Core_Error::fatal('Unknown location type: ' . $values['type']);
     }
 
@@ -308,18 +394,17 @@ if ($contact_id == 7818) {
    */
   static public function createFromRepresentPhone($values, $contact_id) {
     $map = [
-      'legislature' => 8, // FIXME
-      'constituency' => 9, // FIXME
+      'legislature' => Civi::settings()->get('regionlookuprepresent_legislature_loctype_id'),
+      'constituency' => Civi::settings()->get('regionlookuprepresent_constituent_loctype_id'),
     ];
 
     if (!empty($values['tel'])) {
       $params = [];
 
-      if (isset($map[$values['type']])) {
+      if (!empty($map[$values['type']])) {
         $params['location_type_id'] = $map[$values['type']];
       }
-
-      if (empty($params['location_type_id'])) {
+      else {
         CRM_Core_Error::fatal('Unknown location type: ' . $values['type']);
       }
 
@@ -355,7 +440,7 @@ if ($contact_id == 7818) {
       $result = civicrm_api3('Phone', 'get', [
         'contact_id' => $contact_id,
         'location_type_id' => $params['location_type_id'],
-        'phone_type_id' => 3, // FIXME 3=phone
+        'phone_type_id' => 3, // FIXME 3=fax
         'sequential' => 1,
       ]);
 
