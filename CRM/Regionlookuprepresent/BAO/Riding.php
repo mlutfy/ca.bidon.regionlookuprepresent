@@ -23,6 +23,10 @@ class CRM_Regionlookuprepresent_BAO_Riding {
 
     $contact_id = self::createFromRepresentContact($values, $contact_sub_type, $contact_id);
 
+    if (Civi::settings()->get('regionlookuprepresent_federalriding_nickname')) {
+      self::saveImageToDisk($values['photo_url'], $contact_id);
+    }
+
     self::createFromRepresentEmail($values, $contact_id);
     self::createFromRepresentWebsites($values, $contact_id);
     self::createFromRepresentIndividual($values, $contact_id);
@@ -60,6 +64,10 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       }
 
       $params['organization_name'] = $values['district_name'];
+    }
+
+    if (Civi::settings()->get('regionlookuprepresent_federalriding_nickname')) {
+      $params['nick_name'] = $values['first_name'] . ' ' . $values['last_name'];
     }
 
     // FIXME: hardcoded custom field
@@ -164,7 +172,6 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       "$custom_party" => $params['party_name'],
     ]);
 
-    // FIXME/TODO: photo_url
     self::saveImageToDisk($params['photo_url'], $individual['id']);
 
     civicrm_api3('Relationship', 'create', [
@@ -478,6 +485,11 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     return $phone;
   }
 
+  /**
+   * Convert the image URL into a filename that can be saved to disk.
+   *
+   * Example: 'represent_[contact_id]_[randomhash].[filext]'.
+   */
   static public function getConvertedImageFilename($photo_url, $contact_id) {
     if (preg_match('/\.(\w+)$/', $photo_url, $matches)) {
       $photo_url = 'represent_' . $contact_id . '_' . sha1($photo_url) . '.' . $matches[1];
@@ -487,25 +499,40 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     return NULL;
   }
 
+  /**
+   * Given a photo_url and a contact_id, fetch the image and save it
+   * locally, set the image as the contact image_URL.
+   */
   static public function saveImageToDisk($photo_url, $contact_id) {
     if (empty($photo_url)) {
       return NULL;
     }
 
-    $options = array('http' => array('user_agent' => 'CiviCRM RegionLookupRepresent'));
-    $context = stream_context_create($options);
-    $image = file_get_contents($photo_url, FALSE, $context);
+    $image_filename = self::getConvertedImageFilename($photo_url, $contact_id);
 
     $config = CRM_Core_Config::singleton();
-    $basedir = $config->customFileUploadDir;
+    $disk_file_name = $config->customFileUploadDir . '/' . $image_filename;
 
-    $photo_url = self::getConvertedImageFilename($photo_url, $contact_id);
-    $disk_file_name = $basedir . '/' . $photo_url;
-    file_put_contents($disk_file_name, $image);
+    // Fetch with Guzzle instead of Curl, because some filenames have accents
+    // and Guzzle handles all the things you would expect it to.
+    $client = new GuzzleHttp\Client();
+
+    $response = $client->request('GET', $photo_url, [
+      'headers' => [
+        'User-Agent' => 'CiviCRM RegionLookupRepresent',
+      ],
+      // Save to disk
+      // http://guzzle.readthedocs.io/en/latest/request-options.html#sink-option
+      'sink' => $disk_file_name,
+    ]);
+
+    // In civicrm_contact.image_URL, we need to store an URL such as:
+    // https://example.org/civicrm/contact/imagefile?photo=represent_152_1be83a292ad8f4c8f82728624faf453a7485fe11.jpg
+    $image_url = CRM_Utils_System::url('civicrm/contact/imagefile', "photo={$image_filename}");
 
     civicrm_api3('Contact', 'create', [
       'id' => $contact_id,
-      'image_URL' => $photo_url,
+      'image_URL' => $image_url,
     ]);
   }
 

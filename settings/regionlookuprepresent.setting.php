@@ -28,6 +28,21 @@ return [
       'api_field' => 'label',
     ),
   ],
+  'regionlookuprepresent_federalriding_nickname' => [
+    'group_name' => 'domain',
+    'group' => 'regionlookuprepresent',
+    'name' => 'regionlookuprepresent_federalriding_nickname',
+    'type' => 'Integer',
+    'default' => NULL,
+    'add' => '1.0',
+    'is_domain' => 1,
+    'is_contact' => 0,
+    'title' => E::ts('Add the MP name in the federal riding nickname field?'), // FIXME: we also use this to add the photo to the riding's record
+    'description' => E::ts("This can help with looking up ridings using the MP's name."),
+    'help_text' => '',
+    'quick_form_type' => 'YesNo',
+    'html_type' => 'Radio',
+  ],
   'regionlookuprepresent_federalriding_mp_ctype' => [
     'group_name' => 'domain',
     'group' => 'regionlookuprepresent',

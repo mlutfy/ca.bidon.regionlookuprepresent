@@ -98,3 +98,14 @@ function regionlookuprepresent_civicrm_alterSettingsFolders(&$metaDataFolders){
     $metaDataFolders[] = $extDir;
   }
 }
+
+/**
+ * Implements hook_civicrm_pageRun().
+ */
+function regionlookuprepresent_civicrm_pageRun(&$page) {
+  $pageName = $page->getVar('_name');
+
+  if ($pageName == 'CRM_Contact_Page_View_Summary') {
+    CRM_Regionlookuprepresent_Contact_Page_View_Summary::pageRun($page);
+  }
+}
