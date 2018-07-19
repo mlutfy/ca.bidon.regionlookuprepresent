@@ -104,7 +104,8 @@ class CRM_Regionlookuprepresent_BAO_Riding {
         'id' => '$value.contact_id_b',
         'return.first_name' => 1,
         'return.last_name' => 1,
-        'return.$custom_party' => 1,
+        'return.image_URL' => 1,
+        "return.$custom_party" => 1,
       ],
     ]);
 
@@ -117,6 +118,15 @@ class CRM_Regionlookuprepresent_BAO_Riding {
 
       if ($c['first_name'] == $values['first_name'] && $c['last_name'] == $values['last_name']) {
         $found_individual = TRUE;
+
+        // Check if the photo was updated (new photo when they get re-elected)
+        $photo_url = self::getConvertedImageFilename($values['photo_url'], $c['id']);
+
+        if ($c['image_URL'] != $photo_url) {
+          $photo_url = self::saveImageToDisk($values['photo_url'], $c['id']);
+        }
+
+        // FIXME/TODO: check if the party has changed.
       }
       else {
         civicrm_api3('Relationship', 'create', [
@@ -155,6 +165,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     ]);
 
     // FIXME/TODO: photo_url
+    self::saveImageToDisk($params['photo_url'], $individual['id']);
 
     civicrm_api3('Relationship', 'create', [
       'relationship_type_id' => $params['relationship_type_id'],
@@ -465,6 +476,37 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     $phone = str_replace('/ /', '-', $phone);
 
     return $phone;
+  }
+
+  static public function getConvertedImageFilename($photo_url, $contact_id) {
+    if (preg_match('/\.(\w+)$/', $photo_url, $matches)) {
+      $photo_url = 'represent_' . $contact_id . '_' . sha1($photo_url) . '.' . $matches[1];
+      return $photo_url;
+    }
+
+    return NULL;
+  }
+
+  static public function saveImageToDisk($photo_url, $contact_id) {
+    if (empty($photo_url)) {
+      return NULL;
+    }
+
+    $options = array('http' => array('user_agent' => 'CiviCRM RegionLookupRepresent'));
+    $context = stream_context_create($options);
+    $image = file_get_contents($photo_url, FALSE, $context);
+
+    $config = CRM_Core_Config::singleton();
+    $basedir = $config->customFileUploadDir;
+
+    $photo_url = self::getConvertedImageFilename($photo_url, $contact_id);
+    $disk_file_name = $basedir . '/' . $photo_url;
+    file_put_contents($disk_file_name, $image);
+
+    civicrm_api3('Contact', 'create', [
+      'id' => $contact_id,
+      'image_URL' => $photo_url,
+    ]);
   }
 
 }
