@@ -8,7 +8,7 @@ function civicrm_api3_regionlookuprepresent_updatefederalridings($params) {
   $contact_sub_type_id = Civi::settings()->get('regionlookuprepresent_federalriding_ctype');
 
   if (empty($contact_sub_type_id)) {
-    Civi::log()->debug('RegionlookupRepresent: updateFederalRidings skipped, since regionlookuprepresent_federalriding_ctype is not set.');
+    Civi::log()->warning('RegionlookupRepresent: updateFederalRidings skipped, since regionlookuprepresent_federalriding_ctype is not set.');
     return;
   }
 

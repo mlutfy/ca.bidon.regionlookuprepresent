@@ -3,16 +3,22 @@
 class CRM_Regionlookuprepresent_BAO_Riding {
 
   /**
+   * States/provinces abbreviations
+   * @var array
+   */
+  private static $province_abbreviations = [];
+
+  /**
    *
    */
-  static public function createFromRepresent($values, $contact_sub_type) {
+  static public function createFromRepresent($values, $contact_sub_type, $suffix = '') {
     $contact_id = NULL;
 
     // Check if the Riding already exists.
     $result = civicrm_api3('Contact', 'get', [
       'contact_type' => 'Organization',
       'contact_sub_type' => $contact_sub_type,
-      'organization_name' => $values['district_name'],
+      'organization_name' => $values['district_name'] . $suffix,
       'return.contact_id' => 1,
       'sequential' => 1,
     ]);
@@ -21,7 +27,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       $contact_id = $result['values'][0]['contact_id'];
     }
 
-    $contact_id = self::createFromRepresentContact($values, $contact_sub_type, $contact_id);
+    $contact_id = self::createFromRepresentContact($values, $contact_sub_type, $contact_id, $suffix);
 
     if (Civi::settings()->get('regionlookuprepresent_federalriding_nickname')) {
       self::saveImageToDisk($values['photo_url'], $contact_id);
@@ -42,15 +48,15 @@ class CRM_Regionlookuprepresent_BAO_Riding {
         $found_constituency_office = TRUE;
       }
 
-      self::createFromRepresentAddress($office, $contact_id);
-      self::createFromRepresentPhone($office, $contact_id);
+      self::createFromRepresentAddress($values, $office, $contact_id);
+      self::createFromRepresentPhone($values, $office, $contact_id);
     }
   }
 
   /**
    * Creates the organisation record for the riding.
    */
-  static public function createFromRepresentContact($values, $contact_sub_type, $contact_id = NULL) {
+  static public function createFromRepresentContact($values, $contact_sub_type, $contact_id = NULL, $suffix = NULL) {
     $params = [];
     $params['contact_type'] = 'Organization';
     $params['contact_sub_type'] = $contact_sub_type;
@@ -60,14 +66,21 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     }
     else {
       if (empty($values['district_name'])) {
-        CRM_Core_Error::fatal('district_name is required when creating new Ridings.');
+        throw new Exception('district_name is required when creating new Ridings.');
       }
 
-      $params['organization_name'] = $values['district_name'];
+      // FIXME: the suffix is a hack for provinces
+      $params['organization_name'] = $values['district_name'] . $suffix;
     }
 
     if (Civi::settings()->get('regionlookuprepresent_federalriding_nickname')) {
       $params['nick_name'] = $values['first_name'] . ' ' . $values['last_name'];
+
+      if ($p = Civi::settings()->get('regionlookuprepresent_party_field')) {
+        $custom_party = 'custom_' . $p;
+
+        $params[$custom_party] = $values['party_name'];
+      }
     }
 
     // FIXME: hardcoded custom field
@@ -86,7 +99,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
    * Given an organisation (riding) contact_id, create/update the individual
    * record for the member of parliament.
    */
-  static public function createFromRepresentIndividual($values, $contact_id) {
+  static public function createFromRepresentIndividual(&$values, $contact_id) {
     // Fetch relationships of type "member of parliament"
 
     $relationship_type_id = Civi::settings()->get('regionlookuprepresent_federalriding_mp_reltype');
@@ -186,7 +199,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
   /**
    *
    */
-  static public function createFromRepresentEmail($values, $contact_id) {
+  static public function createFromRepresentEmail(&$values, $contact_id) {
     $params = [];
 
     $location_type_id = Civi::settings()->get('regionlookuprepresent_email_loctype_id');
@@ -229,7 +242,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
   /**
    *
    */
-  static public function createFromRepresentWebsites($values, $contact_id) {
+  static public function createFromRepresentWebsites(&$values, $contact_id) {
     $params = [];
 
     $website_type_id = Civi::settings()->get('regionlookuprepresent_website_type_id');
@@ -305,7 +318,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
   /**
    *
    */
-  static public function createFromRepresentAddress($values, $contact_id) {
+  static public function createFromRepresentAddress(&$values, $office, $contact_id) {
     $map = [
       'legislature' => Civi::settings()->get('regionlookuprepresent_legislature_loctype_id'),
       'constituency' => Civi::settings()->get('regionlookuprepresent_constituent_loctype_id'),
@@ -316,16 +329,20 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       'country_id' => 1039, // FIXME 1039=Canada
     ];
 
-    if (empty($values['postal'])) {
+    if (empty($office['postal'])) {
       return;
     }
 
-    if (!empty($map[$values['type']])) {
-      $params['location_type_id'] = $map[$values['type']];
+    if (!isset($map[$office['type']])) {
+      throw new Exception('createFromRepresentAddress: Unknown location type: ' . $values['type']);
     }
-    else {
-      CRM_Core_Error::fatal('Unknown location type: ' . $values['type']);
+
+    if (empty($map[$office['type']])) {
+      Civi::log()->debug("createFromRepresentAddress: type = {$values['type']}, no civicrm setting found, ignoring.");
+      return;
     }
+
+    $params['location_type_id'] = $map[$office['type']];
 
     // Search for an existing address
     $result = civicrm_api3('Address', 'get', [
@@ -338,7 +355,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       $params['id'] = $result['values'][0]['id'];
     }
 
-    $parts = explode("\n", $values['postal']);
+    $parts = explode("\n", $office['postal']);
 
     // FIXME: assuming the line 1 is the main address, line 2 is appt/unit, line 3 has comment, line 4 has city, province, postcode.
     // This seem normalized in the Federal data, but is it in other data sets?
@@ -346,8 +363,20 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     // Example:
     // 886 Thornhill Street
     // (Main Office)
-    // Unit E                                                  
+    // Unit E
     // Morden MB  R6M 2E1
+
+    // Some provinces have everything on the same line
+    // ex: Parliament Buildings, Victoria BC  V8V 1X4
+    // ex: Constituency:, PO Box 269, #1-16 High Street, Ladysmith, BC V9G 1A2, douglas.routley.MLA@leg.bc.ca
+    if (count($parts) == 1) {
+      $parts = explode(', ', $office['postal']);
+
+      // Specific to BC in 2018
+      if ($parts[0] == 'Constituency:') {
+        $t = array_shift($parts);
+      }
+    }
 
     // We only import the Main Office, so this is not relevant.
     $parts[0] = preg_replace('/\(Main Office\)/', '', $parts[0]);
@@ -369,6 +398,15 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       else {
         $params['supplemental_address_1'] .= ' ' . array_shift($parts);
       }
+
+      // BC-specific, watch to see if the last line has an email address
+      if (preg_match('/@[\.a-zA-Z]+$/', $parts[1])) {
+        if (empty($values['email'])) {
+          $values['email'] = $parts[1];
+        }
+
+        unset($parts[1]);
+      }
     }
 
     // Extract the postal code
@@ -381,20 +419,21 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     }
 
     // Extract the province
-    static $province_abbreviations = NULL;
-
-    if (empty($province_abbreviations)) {
-      $province_abbreviations = CRM_Core_PseudoConstant::stateProvinceAbbreviation(NULL, TRUE);
+    if (empty(self::$province_abbreviations)) {
+      self::loadProvinceAbbreviations();
     }
 
-    if (preg_match('/ ([A-Z]{2})$/', $last_line, $matches)) {
-      $params['state_province_id'] = array_search($matches[1], $province_abbreviations);
+    // We might have the city on its own line, or on the same line:
+    // ex: Victoria BC  V8V 1X4
+    // or just: BC  V8V 1X4
+    if (preg_match('/ ([A-Z]{2})$/', $last_line, $matches) || preg_match('/^([A-Z]{2})$/', $last_line, $matches)) {
+      $params['state_province_id'] = array_search($matches[1], self::$province_abbreviations);
       $last_line = preg_replace('/ [A-Z]{2}$/', '', $last_line);
       $last_line = trim($last_line);
     }
 
     if (empty($params['state_province_id'])) {
-      CRM_Core_Error::fatal('Unknown state/province: ' . $last_line . ' -- ' . print_r($values, 1));
+      throw new Exception('Unknown state/province: ' . $last_line . ' -- ' . print_r($office, 1) . ' -- ' . print_r($params, 1));
     }
 
     // We assume that what is left is the city
@@ -410,21 +449,25 @@ class CRM_Regionlookuprepresent_BAO_Riding {
   /**
    *
    */
-  static public function createFromRepresentPhone($values, $contact_id) {
+  static public function createFromRepresentPhone($values, $office, $contact_id) {
     $map = [
       'legislature' => Civi::settings()->get('regionlookuprepresent_legislature_loctype_id'),
       'constituency' => Civi::settings()->get('regionlookuprepresent_constituent_loctype_id'),
     ];
-
-    if (!empty($values['tel'])) {
+drush_log('COUCOU ' . print_r($office, 1), 'ok');
+    if (!empty($office['tel'])) {
       $params = [];
 
-      if (!empty($map[$values['type']])) {
-        $params['location_type_id'] = $map[$values['type']];
+      if (!isset($map[$office['type']])) {
+        throw new Exception('createFromRepresentPhone: Unknown location type: ' . $office['type']);
       }
-      else {
-        CRM_Core_Error::fatal('Unknown location type: ' . $values['type']);
+
+      if (empty($map[$office['type']])) {
+        Civi::log()->debug("createFromRepresentPhone: type = {$office['type']}, no civicrm setting found, ignoring.");
+        return;
       }
+
+      $params['location_type_id'] = $map[$office['type']];
 
       $result = civicrm_api3('Phone', 'get', [
         'contact_id' => $contact_id,
@@ -438,21 +481,21 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       }
 
       $params['contact_id'] = $contact_id;
-      $params['phone'] = self::cleanupPhone($values['tel']);
+      $params['phone'] = self::cleanupPhone($office['tel']);
       $params['phone_type_id'] = 1; // FIXME
 
       civicrm_api3('Phone', 'create', $params);
     }
 
-    if (!empty($values['fax'])) {
+    if (!empty($office['fax'])) {
       $params = [];
 
-      if (isset($map[$values['type']])) {
-        $params['location_type_id'] = $map[$values['type']];
+      if (isset($map[$office['type']])) {
+        $params['location_type_id'] = $map[$office['type']];
       }
 
       if (empty($params['location_type_id'])) {
-        CRM_Core_Error::fatal('Unknown location type: ' . $values['type']);
+        CRM_Core_Error::fatal('Unknown location type: ' . $office['type']);
       }
 
       $result = civicrm_api3('Phone', 'get', [
@@ -467,7 +510,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       }
 
       $params['contact_id'] = $contact_id;
-      $params['phone'] = self::cleanupPhone($values['fax']);
+      $params['phone'] = self::cleanupPhone($office['fax']);
       $params['phone_type_id'] = 3; // FIXME 3=fax
 
       civicrm_api3('Phone', 'create', $params);
@@ -480,7 +523,7 @@ class CRM_Regionlookuprepresent_BAO_Riding {
    */
   static public function cleanupPhone($phone) {
     $phone = preg_replace('/^1 /', '', $phone);
-    $phone = str_replace('/ /', '-', $phone);
+    $phone = str_replace(' ', '-', $phone);
 
     return $phone;
   }
@@ -496,7 +539,10 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       return $photo_url;
     }
 
-    return NULL;
+    // Otherwise assume JPG
+    // Ex: Quebec returns oddly named '.aspx' images.
+    $photo_url = 'represent_' . $contact_id . '_' . sha1($photo_url) . '.jpg';
+    return $photo_url;
   }
 
   /**
@@ -534,6 +580,13 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       'id' => $contact_id,
       'image_URL' => $image_url,
     ]);
+  }
+
+  static public function loadProvinceAbbreviations() {
+    $canada_id = CRM_Core_DAO::singleValueQuery("SELECT id FROM civicrm_country WHERE name = 'Canada'");
+    $whereClause = 'country_id = ' . $canada_id;
+
+    CRM_Core_PseudoConstant::populate(self::$province_abbreviations, 'CRM_Core_DAO_StateProvince', TRUE, 'abbreviation', 'is_active', $whereClause);
   }
 
 }
