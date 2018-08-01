@@ -1,6 +1,6 @@
 <?php
 
-function civicrm_api3_regionlookuprepresent_updatefederalridings($params) {
+function civicrm_api3_job_regionlookuprepresentupdatefederalridings($params) {
   $options = array('http' => array('user_agent' => 'CiviCRM RegionLookupRepresent'));
   $context = stream_context_create($options);
   $result = file_get_contents('https://represent.opennorth.ca/representatives/house-of-commons/?limit=999', FALSE, $context);
@@ -24,4 +24,9 @@ function civicrm_api3_regionlookuprepresent_updatefederalridings($params) {
       CRM_Regionlookuprepresent_BAO_Riding::createFromRepresent($values, $contact_sub_type);
     }
   }
+
+  // Wishlist: provide a status of how many contacts were updated?
+  $message = ts('Done');
+
+  return civicrm_api3_create_success($message);
 }

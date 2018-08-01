@@ -100,6 +100,18 @@ function regionlookuprepresent_civicrm_alterSettingsFolders(&$metaDataFolders){
 }
 
 /**
+ * Implements hook_civicrm_managed().
+ *
+ * Generate a list of entities to create/deactivate/delete when this module
+ * is installed, disabled, uninstalled.
+ *
+ * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_managed
+ */
+function regionlookuprepresent_civicrm_managed(&$entities) {
+  _regionlookuprepresent_civix_civicrm_managed($entities);
+}
+
+/**
  * Implements hook_civicrm_pageRun().
  */
 function regionlookuprepresent_civicrm_pageRun(&$page) {

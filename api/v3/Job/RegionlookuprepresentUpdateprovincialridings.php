@@ -1,6 +1,6 @@
 <?php
 
-function civicrm_api3_regionlookuprepresent_updateprovincialridings($params) {
+function civicrm_api3_job_regionlookuprepresentupdateprovincialridings($params) {
   // Pre-flight checks
   $contact_sub_type_id = Civi::settings()->get('regionlookuprepresent_provincialriding_ctype');
 
@@ -60,4 +60,9 @@ function civicrm_api3_regionlookuprepresent_updateprovincialridings($params) {
       CRM_Regionlookuprepresent_BAO_Riding::createFromRepresent($values, $contact_sub_type, $suffix);
     }
   }
+
+  // Wishlist: provide a status of how many contacts were updated?
+  $message = ts('Done');
+
+  return civicrm_api3_create_success($message);
 }
