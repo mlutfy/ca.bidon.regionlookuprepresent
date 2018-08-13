@@ -15,7 +15,7 @@ return [
       'description' => 'Updates Federal MP information using Open North Represent',
       'run_frequency' => 'Weekly',
       'api_entity' => 'Job',
-      'api_action' => 'regionlookuprepresentupdatefederalridings',
+      'api_action' => 'RegionlookuprepresentUpdatefederalridings',
       'parameters' => '',
     ],
     'update' => 'never',
