@@ -454,12 +454,12 @@ class CRM_Regionlookuprepresent_BAO_Riding {
       'legislature' => Civi::settings()->get('regionlookuprepresent_legislature_loctype_id'),
       'constituency' => Civi::settings()->get('regionlookuprepresent_constituent_loctype_id'),
     ];
-drush_log('COUCOU ' . print_r($office, 1), 'ok');
+
     if (!empty($office['tel'])) {
       $params = [];
 
       if (!isset($map[$office['type']])) {
-        throw new Exception('createFromRepresentPhone: Unknown location type: ' . $office['type']);
+        Civi::log()->debug("createFromRepresentPhone: type = {$office['type']} is unknown, ignoring.");
       }
 
       if (empty($map[$office['type']])) {
