@@ -433,7 +433,8 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     }
 
     if (empty($params['state_province_id'])) {
-      throw new Exception('Unknown state/province: ' . $last_line . ' -- ' . print_r($office, 1) . ' -- ' . print_r($params, 1));
+      Civi::log()->warning('Unknown state/province: ' . $last_line . ' -- ' . print_r($office, 1) . ' -- ' . print_r($params, 1));
+      return;
     }
 
     // We assume that what is left is the city
@@ -561,25 +562,33 @@ class CRM_Regionlookuprepresent_BAO_Riding {
 
     // Fetch with Guzzle instead of Curl, because some filenames have accents
     // and Guzzle handles all the things you would expect it to.
-    $client = new GuzzleHttp\Client();
+    try {
+      $client = new GuzzleHttp\Client();
 
-    $response = $client->request('GET', $photo_url, [
-      'headers' => [
-        'User-Agent' => 'CiviCRM RegionLookupRepresent',
-      ],
-      // Save to disk
-      // http://guzzle.readthedocs.io/en/latest/request-options.html#sink-option
-      'sink' => $disk_file_name,
-    ]);
+      $response = $client->request('GET', $photo_url, [
+        'headers' => [
+          'User-Agent' => 'CiviCRM RegionLookupRepresent',
+        ],
+        // Save to disk
+        // http://guzzle.readthedocs.io/en/latest/request-options.html#sink-option
+        'sink' => $disk_file_name,
+      ]);
 
-    // In civicrm_contact.image_URL, we need to store an URL such as:
-    // https://example.org/civicrm/contact/imagefile?photo=represent_152_1be83a292ad8f4c8f82728624faf453a7485fe11.jpg
-    $image_url = CRM_Utils_System::url('civicrm/contact/imagefile', "photo={$image_filename}");
+      // In civicrm_contact.image_URL, we need to store an URL such as:
+      // https://example.org/civicrm/contact/imagefile?photo=represent_152_1be83a292ad8f4c8f82728624faf453a7485fe11.jpg
+      $image_url = CRM_Utils_System::url('civicrm/contact/imagefile', "photo={$image_filename}");
 
-    civicrm_api3('Contact', 'create', [
-      'id' => $contact_id,
-      'image_URL' => $image_url,
-    ]);
+      civicrm_api3('Contact', 'create', [
+        'id' => $contact_id,
+        'image_URL' => $image_url,
+      ]);
+    }
+    catch (Exception $e) {
+      Civi::log()->warning('RegionlookupRepresent: failed to download image.', [
+        'url' => $photo_url,
+        'error' => $e->getMessage(),
+      ]);
+    }
   }
 
   static public function loadProvinceAbbreviations() {
