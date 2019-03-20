@@ -27,6 +27,7 @@ class CRM_Regionlookuprepresent_Form_RegionlookupRepresentSettings extends CRM_C
   public function buildQuickForm() {
     $settings = $this->getFormSettings();
     $descriptions = [];
+    $subsections = [];
 
     foreach ($settings as $name => $setting) {
       if (isset($setting['quick_form_type'])) {
@@ -73,10 +74,19 @@ class CRM_Regionlookuprepresent_Form_RegionlookupRepresentSettings extends CRM_C
         if (!empty($setting['description'])) {
           $elementDescriptions[$setting['name']] = $setting['description'];
         }
-      }
 
-      $this->assign("elementDescriptions", $elementDescriptions);
+        if ($s = CRM_Utils_Array::value('subsection', $setting)) {
+          if (!isset($subsections[$s])) {
+            $subsections[$s] = [];
+          }
+
+          $subsections[$s][] = $name;
+        }
+      }
     }
+
+    $this->assign("elementDescriptions", $elementDescriptions);
+    $this->assign("subsections", $subsections);
 
     $this->addButtons(array(
       array (
