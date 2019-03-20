@@ -12,20 +12,8 @@ class CRM_Regionlookuprepresent_BAO_Riding {
    *
    */
   static public function createFromRepresent($values, $contact_sub_type, $suffix = '') {
-    $contact_id = NULL;
-
-    // Check if the Riding already exists.
-    $result = civicrm_api3('Contact', 'get', [
-      'contact_type' => 'Organization',
-      'contact_sub_type' => $contact_sub_type,
-      'organization_name' => $values['district_name'] . $suffix,
-      'return.contact_id' => 1,
-      'sequential' => 1,
-    ]);
-
-    if ($result['count']) {
-      $contact_id = $result['values'][0]['contact_id'];
-    }
+    // Check if the Riding already exists (and later update if necessary).
+    $contact_id = self::findRiding($values['district_name'] . $suffix, $contact_sub_type);
 
     $contact_id = self::createFromRepresentContact($values, $contact_sub_type, $contact_id, $suffix);
 
@@ -76,10 +64,15 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     if (Civi::settings()->get('regionlookuprepresent_federalriding_nickname')) {
       $params['nick_name'] = $values['first_name'] . ' ' . $values['last_name'];
 
-      if ($p = Civi::settings()->get('regionlookuprepresent_party_field')) {
-        $custom_party = 'custom_' . $p;
+      if ($id = Civi::settings()->get('regionlookuprepresent_party_field')) {
+        $cf = 'custom_' . $id;
+        $params[$cf] = $values['party_name'];
+      }
 
-        $params[$custom_party] = $values['party_name'];
+      if ($id = Civi::settings()->get('regionlookuprepresent_boundary_url')) {
+        $cf = 'custom_' . $id;
+        // Represent returns a relative URL, ex: /boundaries/foo
+        $params[$cf] = 'https://represent.opennorth.ca' . $values['related']['boundary_url'];
       }
     }
 
@@ -596,6 +589,57 @@ class CRM_Regionlookuprepresent_BAO_Riding {
     $whereClause = 'country_id = ' . $canada_id;
 
     CRM_Core_PseudoConstant::populate(self::$province_abbreviations, 'CRM_Core_DAO_StateProvince', TRUE, 'abbreviation', 'is_active', $whereClause);
+  }
+
+  /**
+   *
+   */
+  static public function findRiding($name, $contact_sub_type) {
+    $result = civicrm_api3('Contact', 'get', [
+      'contact_type' => 'Organization',
+      'contact_sub_type' => $contact_sub_type,
+      'organization_name' => $name,
+      'return.contact_id' => 1,
+      'sequential' => 1,
+    ]);
+
+    if ($result['count']) {
+      return $result['values'][0]['contact_id'];
+    }
+
+    // Search for variants because sometimes names have '—' and sometimes '-'.
+    if (strpos($name, '—') !== FALSE) {
+      $name = str_replace('—', '-', $name);
+
+      $result = civicrm_api3('Contact', 'get', [
+        'contact_type' => 'Organization',
+        'contact_sub_type' => $contact_sub_type,
+        'organization_name' => $name,
+        'return.contact_id' => 1,
+        'sequential' => 1,
+      ]);
+
+      if ($result['count']) {
+        return $result['values'][0]['contact_id'];
+      }
+    }
+    elseif (strpos($name, '-') !== FALSE) {
+      $name = str_replace('-', '—', $name);
+
+      $result = civicrm_api3('Contact', 'get', [
+        'contact_type' => 'Organization',
+        'contact_sub_type' => $contact_sub_type,
+        'organization_name' => $name,
+        'return.contact_id' => 1,
+        'sequential' => 1,
+      ]);
+
+      if ($result['count']) {
+        return $result['values'][0]['contact_id'];
+      }
+    }
+
+    return NULL;
   }
 
 }
