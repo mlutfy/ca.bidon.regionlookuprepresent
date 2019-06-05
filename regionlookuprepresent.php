@@ -121,3 +121,17 @@ function regionlookuprepresent_civicrm_pageRun(&$page) {
     CRM_Regionlookuprepresent_Contact_Page_View_Summary::pageRun($page);
   }
 }
+
+/**
+ * Implements hook_civicrm_alterAPIPermissions().
+ */
+function regionlookuprepresent_civicrm_alterAPIPermissions($entity, $action, &$params, &$permissions) {
+  // This is all public information
+  // Although, it might be better to have a custom permission.
+  $permissions['regionlookuprepresent']['getlegislator'] = array('access AJAX API');
+  $permissions['regionlookuprepresent']['lookupridingbygeo'] = array('access AJAX API');
+  $permissions['regionlookuprepresent']['lookuprepbydistrict'] = array('access AJAX API');
+  $permissions['regionlookuprepresent']['lookupridingbypostcode'] = array('access AJAX API');
+  $permissions['regionlookuprepresent']['lookupridingbyrepname'] = array('access AJAX API');
+  $permissions['regionlookuprepresent']['lookupboundary'] = array('access AJAX API');
+}
