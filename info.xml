@@ -14,16 +14,25 @@
     <url desc="Support">https://github.com/mlutfy/ca.bidon.regionlookuprepresent</url>
     <url desc="Licensing">http://www.gnu.org/licenses/agpl-3.0.html</url>
   </urls>
-  <releaseDate>2015-09-29</releaseDate>
-  <version>1.0</version>
+  <releaseDate>2024-01-09</releaseDate>
+  <version>1.1</version>
   <develStage>beta</develStage>
   <compatibility>
-    <ver>4.4</ver>
-    <ver>4.5</ver>
-    <ver>4.6</ver>
+    <ver>5.65</ver>
   </compatibility>
   <comments>Commercial support available from Coop SymbioTIC (www.symbiotic.coop)</comments>
   <civix>
     <namespace>CRM/Regionlookuprepresent</namespace>
+    <format>23.02.1</format>
   </civix>
+  <mixins>
+    <mixin>menu-xml@1.0.0</mixin>
+    <mixin>mgd-php@1.0.0</mixin>
+    <mixin>setting-php@1.0.0</mixin>
+    <mixin>smarty-v2@1.0.1</mixin>
+  </mixins>
+  <classloader>
+    <psr0 prefix="CRM_" path="."/>
+    <psr4 prefix="Civi\" path="Civi"/>
+  </classloader>
 </extension>
